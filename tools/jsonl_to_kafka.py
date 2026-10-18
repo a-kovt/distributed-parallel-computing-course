@@ -11,8 +11,8 @@ the same key goes to the same partition. Success means the broker acknowledged e
 
 Run from the project root (uv installs the dependency):
 
-    uv run tools/jsonl_to_kafka.py events.jsonl gate-events --key branch_id --pace-ms 5
-    uv run tools/jsonl_to_kafka.py events.jsonl gate-events --key branch_id --bootstrap localhost:9095
+    uv run tools/jsonl_to_kafka.py events.jsonl gate-events --key gate_id --pace-ms 5
+    uv run tools/jsonl_to_kafka.py events.jsonl gate-events --key gate_id --bootstrap localhost:9095
 
 From the host, Kafka must advertise an external listener (port 9095 in the compose
 template); otherwise run the tool inside the Compose network. Exit code 1 if any event was
@@ -102,7 +102,7 @@ def main() -> int:
     if not (math.isfinite(args.timeout) and args.timeout > 0 and math.isfinite(args.pace_ms) and args.pace_ms >= 0):
         parser.error("--timeout must be positive and --pace-ms not negative")
 
-    from confluent_kafka import Producer  # imported here: the tests use a fake producer without the package
+    from confluent_kafka import Producer  # imported here: the functions above work with any producer object
 
     producer = Producer({"bootstrap.servers": args.bootstrap, "acks": "all", "enable.idempotence": True})
     return publish(producer, args.file, args.topic, args.key, args.pace_ms, args.timeout)

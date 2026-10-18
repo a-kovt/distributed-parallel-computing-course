@@ -1,14 +1,14 @@
 """Run your HTTP scenario many times and record what the client saw (Python 3.14, standard library).
 
-A scenario is your Python file with a function scenario(ctx) (examples: <course>/workload/
+A scenario is your Python file with a function scenario(ctx) (example: tools/workload/
 scenario.example.py); the optional validate(bases, settings) checks the settings before the run.
-Run from the root of the copied kit (the folder that contains workload/):
+Run from the project root:
 
-    uv run --no-project --python 3.14 python tools/workload/run.py my-scenario.py \\
-        --base api=http://localhost:8080 --env token=API_TOKEN --set resource_id=r1 \\
+    uv run --no-project --python 3.14 python tools/workload/run.py tools/workload/my-scenario.py \\
+        --base api=http://localhost:8000 --env token=API_TOKEN --set resource_id=r1 \\
         --runs 1 --pause 1 --out runs/demo-01
-    uv run --no-project --python 3.14 python tools/workload/run.py my-scenario.py \\
-        --base api=http://localhost:8080 --env token=API_TOKEN --set resource_id=r1 \\
+    uv run --no-project --python 3.14 python tools/workload/run.py tools/workload/my-scenario.py \\
+        --base api=http://localhost:8000 --env token=API_TOKEN --set resource_id=r1 \\
         --duration 60 --rate 20 --concurrency 10 --out runs/load-01
 
 --rate is scenario starts per second, not HTTP requests. When all --concurrency workers are

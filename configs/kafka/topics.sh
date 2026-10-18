@@ -1,5 +1,5 @@
 #!/bin/sh
-# Creates the topics "name:partitions" listed in TOPICS (the broker-init service runs it once).
+# Creates the topics "name:partitions" listed in TOPICS (the kafka-init service runs it once).
 # Existing topics are kept. To start an experiment from scratch see docs/ENVIRONMENT.md, "Kafka".
 set -eu
 

@@ -7,7 +7,7 @@ tokens.txt
 tokens-*.txt
 tokens_*.txt
 
-# Generated datasets and simulator state
+# Generated data
 data/
 rows.csv
 state.jsonl

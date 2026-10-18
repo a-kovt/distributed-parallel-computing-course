@@ -45,7 +45,7 @@ async def connection() -> AsyncIterator[AsyncConnection]:
 
 
 async def ping() -> bool:
-    """For /ready: can this instance reach the database right now?"""
+    """Can this instance reach the database right now? For a readiness route of your own, e.g. /ready."""
     try:
         async with connection() as conn:
             await conn.execute("SELECT 1")

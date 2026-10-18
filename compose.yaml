@@ -1,6 +1,6 @@
 # All services of the DPC project (labs 1-6 and the additional items). From this folder:
 #   cp .env.example .env && docker compose up -d --build
-# Docker needs about 10-12 GB of memory for everything; addresses and what to stop: KIT.md.
+# Docker needs about 10-12 GB of memory for everything; addresses and what to stop: README.md.
 
 x-api: &api
   build: ./api
