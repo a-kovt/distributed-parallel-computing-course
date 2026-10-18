@@ -1,0 +1,13 @@
+# GET /metrics/prom of api (Prometheus text format) and the metrics of Ray; http://localhost:9091/targets
+global:
+  scrape_interval: 5s
+scrape_configs:
+  - job_name: api
+    metrics_path: /metrics/prom
+    static_configs:
+      - targets:
+          - api:8000
+  - job_name: ray
+    static_configs:
+      - targets:
+          - ray-head:8080

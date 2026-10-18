@@ -1,0 +1,310 @@
+# All services of the DPC project (labs 1-6 and the additional items). From this folder:
+#   cp .env.example .env && docker compose up -d --build
+# Docker needs about 10-12 GB of memory for everything; addresses and what to stop: KIT.md.
+
+x-api: &api
+  build: ./api
+  image: project-dpc-api:${APP_TAG:-dev}
+  environment: &api-env
+    DATABASE_URL: postgresql://app:app@postgres:5432/app
+    API_TOKEN: ${API_TOKEN:-dev-token}
+    CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:8083}
+    RAY_ADDRESS: ray://ray-head:10001
+    RUNNER_URL: http://spark-runner:8000
+    KAFKA_BOOTSTRAP: kafka:9092
+    EVENTS_TOPIC: ${EVENTS_TOPIC:-events}
+    ETCD_URL: http://etcd:2379
+    QUEUE_CAPACITY: ${QUEUE_CAPACITY:-50}
+    WORKERS: ${WORKERS:-4}
+    RESOURCE_MODE: ${RESOURCE_MODE:-locked}
+    EXECUTION: ${EXECUTION:-local}
+    IN_FLIGHT_LIMIT: ${IN_FLIGHT_LIMIT:-8}
+    RECEIVER_DELAY_MS: ${RECEIVER_DELAY_MS:-0}
+    FENCING: ${FENCING:-on}
+    FAULTS: "on"
+  volumes:
+    - data:/data
+    - faults:/faults
+  restart: unless-stopped
+
+x-ray-node: &ray-node
+  <<: *api
+  shm_size: 1g
+  depends_on:
+    - ray-head
+
+x-spark: &spark
+  build:
+    context: .
+    dockerfile: spark/Dockerfile
+  image: project-dpc-spark:${APP_TAG:-dev}
+  environment:
+    SPARK_CONF_DIR: /opt/spark-conf
+    DATABASE_URL: postgresql://app:app@postgres:5432/app
+    KAFKA_BOOTSTRAP: kafka:9092
+    EVENTS_TOPIC: ${EVENTS_TOPIC:-events}
+    SPARK_AQE: ${SPARK_AQE:-on}
+    BROADCAST_THRESHOLD: ${BROADCAST_THRESHOLD:-10m}
+    WATERMARK_MINUTES: ${WATERMARK_MINUTES:-10}
+  volumes:
+    - data:/data
+    - ./spark/jobs:/jobs:ro
+    - ./configs/spark/spark-defaults.conf:/opt/spark-conf/spark-defaults.conf:ro
+  restart: unless-stopped
+
+x-spark-worker: &spark-worker
+  <<: *spark
+  command:
+    - "spark-class"
+    - "org.apache.spark.deploy.worker.Worker"
+    - "spark://spark-master:7077"
+    - "--cores"
+    - "2"
+    - "--memory"
+    - "2g"
+  depends_on:
+    - spark-master
+
+x-coordinator: &coordinator
+  build: ./coordinator
+  image: project-dpc-coordinator:${APP_TAG:-dev}
+  environment: &coordinator-env
+    ETCD_URL: http://etcd:2379
+    API_URL: http://api:8000
+    API_TOKEN: ${API_TOKEN:-dev-token}
+    LEASE_TTL_S: ${LEASE_TTL_S:-5}
+    FAULTS: "on"
+  volumes:
+    - faults:/faults
+  depends_on:
+    - etcd
+    - api
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16.4
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U app"
+      interval: 2s
+      retries: 30
+  migrate:
+    image: postgres:16.4
+    command:
+      - "sh"
+      - "/migrate/migrate.sh"
+    environment:
+      DATABASE_URL: "postgresql://app:app@postgres:5432/app"
+      MIGRATIONS_DIR: /migrations
+    volumes:
+      - "./configs/migrate:/migrate:ro"
+      - "./migrations:/migrations:ro"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *api
+    environment:
+      <<: *api-env
+      INSTANCE: api
+    ports:
+      - "${API_PORT:-8000}:8000"
+    cap_add:
+      - SYS_PTRACE
+    stop_grace_period: 120s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  ray-head:
+    <<: *api
+    command:
+      - "ray"
+      - "start"
+      - "--head"
+      - "--port=6379"
+      - "--ray-client-server-port=10001"
+      - "--dashboard-host=0.0.0.0"
+      - "--num-cpus=1"
+      - "--metrics-export-port=8080"
+      - "--block"
+    environment:
+      <<: *api-env
+      INSTANCE: ray-head
+    ports:
+      - "${RAY_DASHBOARD_PORT:-8265}:8265"
+    shm_size: 1g
+  ray-worker:
+    <<: *ray-node
+    command:
+      - "ray"
+      - "start"
+      - "--address=ray-head:6379"
+      - "--num-cpus=2"
+      - "--block"
+    environment:
+      <<: *api-env
+      INSTANCE: ray-worker
+    deploy:
+      replicas: 2
+  ray-worker-extra:
+    <<: *ray-node
+    command:
+      - "ray"
+      - "start"
+      - "--address=ray-head:6379"
+      - "--num-cpus=2"
+      - "--resources={\"extra\": 1}"
+      - "--block"
+    environment:
+      <<: *api-env
+      INSTANCE: ray-worker-extra
+
+  spark-master:
+    <<: *spark
+    command:
+      - "spark-class"
+      - "org.apache.spark.deploy.master.Master"
+      - "--host"
+      - "spark-master"
+    ports:
+      - "${SPARK_MASTER_UI_PORT:-8280}:8080"
+  spark-worker-1: *spark-worker
+  spark-worker-2: *spark-worker
+  spark-runner:
+    <<: *spark
+    command:
+      - "python"
+      - "/runner/runner.py"
+    ports:
+      - "${SPARK_JOB_UI_PORT:-4040}:4040"
+    depends_on:
+      - spark-master
+  spark-history:
+    <<: *spark
+    command:
+      - "sh"
+      - "-c"
+      - "mkdir -p /data/spark-events && exec spark-class org.apache.spark.deploy.history.HistoryServer"
+    ports:
+      - "${SPARK_HISTORY_PORT:-18080}:18080"
+
+  kafka:
+    image: apache/kafka:3.8.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9095
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:${KAFKA_HOST_PORT:-9095}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "${KAFKA_HOST_PORT:-9095}:9095"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"
+      interval: 3s
+      retries: 40
+    restart: unless-stopped
+  kafka-init:
+    image: apache/kafka:3.8.0
+    command:
+      - "sh"
+      - "/scripts/topics.sh"
+    environment:
+      BOOTSTRAP: kafka:9092
+      TOPICS: ${EVENTS_TOPIC:-events}:${EVENTS_PARTITIONS:-3}
+    volumes:
+      - "./configs/kafka:/scripts:ro"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+  kafka-ui:
+    image: kafbat/kafka-ui:v1.3.0
+    environment:
+      KAFKA_CLUSTERS_0_NAME: dpc
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "${KAFKA_UI_PORT:-8185}:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+  stream:
+    <<: *spark
+    command:
+      - "sh"
+      - "-c"
+      - "mkdir -p /data/spark-events && exec spark-submit --master spark://spark-master:7077 --conf spark.ui.port=4041 --conf
+        spark.cores.max=2 --conf spark.executor.memory=1g /jobs/stream.py"
+    ports:
+      - "${SPARK_STREAM_UI_PORT:-4041}:4041"
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_started
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.17
+    command:
+      - "etcd"
+      - "--name=etcd"
+      - "--listen-client-urls=http://0.0.0.0:2379"
+      - "--advertise-client-urls=http://etcd:2379"
+      - "--data-dir=/etcd-data"
+    ports:
+      - "${ETCD_PORT:-2379}:2379"
+  coordinator-a:
+    <<: *coordinator
+    environment:
+      <<: *coordinator-env
+      INSTANCE: coordinator-a
+  coordinator-b:
+    <<: *coordinator
+    environment:
+      <<: *coordinator-env
+      INSTANCE: coordinator-b
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+  grafana:
+    image: grafana/grafana:11.3.1
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+
+volumes:
+  pgdata:
+  data:
+  faults:
