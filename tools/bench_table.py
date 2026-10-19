@@ -55,6 +55,7 @@ def table(runs: dict[int, list[float]]) -> list[str]:
         lines.append(
             f"| {workers} | {median:.3f} | {spread:.3f} | {len(times)} | {speedup:.2f} | {speedup / workers:.2f} |"
         )
+
     return lines
 
 
@@ -67,6 +68,7 @@ def main() -> None:
         runs = read_runs(args.csv)
     except (OSError, ValueError) as error:
         parser.error(str(error))
+
     print("\n".join(table(runs)))
 
 

@@ -30,11 +30,13 @@ def write_batch(batch: DataFrame, batch_id: int) -> None:
     with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
         # TODO (O5.4): upsert the finalized windows by (key, window) in one transaction
         conn.execute("SELECT 1")
+
     print(f"batch {batch_id}: {len(rows)} rows")
 
 
 def main() -> None:
     spark = SparkSession.builder.appName("stream").getOrCreate()
+
     events = (
         spark.readStream.format("kafka")
         .option("kafka.bootstrap.servers", os.environ.get("KAFKA_BOOTSTRAP", "kafka:9092"))
@@ -45,6 +47,7 @@ def main() -> None:
         .select("e.*")
         .withColumn("event_time", F.to_timestamp("event_time"))
     )
+
     # TODO (O5.2): withWatermark("event_time", f"{WATERMARK_MINUTES} minutes"), window, aggregate
     query = (
         events.writeStream.outputMode("append")

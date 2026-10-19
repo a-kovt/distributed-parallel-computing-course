@@ -66,6 +66,7 @@ def make_bodies(template_path: Path | None, count: int, seed: int) -> list[Any]:
     """All bodies are built before the run, so building them does not distort latency."""
     if template_path is None:
         return [None] * count
+
     template = json.loads(template_path.read_text(encoding="utf-8"))
     rnd = random.Random(seed)
     return [fill(template, index, rnd) for index in range(count)]
@@ -74,6 +75,7 @@ def make_bodies(template_path: Path | None, count: int, seed: int) -> list[Any]:
 def send(url: str, method: str, body: Any, headers: dict[str, str], timeout: float) -> Answer:
     data = None if body is None else json.dumps(body).encode()
     request = urllib.request.Request(url, data=data, method=method, headers=headers)
+
     started = time.perf_counter()
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -83,6 +85,7 @@ def send(url: str, method: str, body: Any, headers: dict[str, str], timeout: flo
         status = error.code
     except (OSError, http.client.HTTPException):  # refused, timed out, or the answer broke off while read
         status = NO_ANSWER
+
     return Answer(status, (time.perf_counter() - started) * 1000)
 
 
@@ -101,6 +104,7 @@ def run(args: argparse.Namespace, bodies: list[Any]) -> tuple[list[Answer], floa
     started = time.perf_counter()
     with ThreadPoolExecutor(max_workers=args.concurrency) as pool:
         answers = list(pool.map(one, bodies))
+
     return answers, time.perf_counter() - started
 
 
@@ -133,6 +137,7 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=30, help="seconds per request")
     parser.add_argument("--seed", type=int, default=1)
     args = parser.parse_args()
+
     if args.requests < 1 or args.concurrency < 1 or args.timeout <= 0:
         parser.error("requests, concurrency and timeout must be positive")
 

@@ -48,11 +48,13 @@ class Results:
     def finish(self, elapsed: float, skipped: int, interrupted: bool) -> dict[str, Any]:
         """Close the CSV and write the summary; call only after all scenarios have stopped."""
         self.file.close()
+
         ordered = sorted(self.samples)
         percentiles = {
             name: ordered[max(0, math.ceil(len(ordered) * share) - 1)] if ordered else None
             for name, share in PERCENTILES
         }
+
         summary = {
             "elapsed_seconds": elapsed,
             "requests": sum(self.statuses.values()),
@@ -65,5 +67,6 @@ class Results:
             "latency_sample_count": len(ordered),
             "latency_sample_policy": f"last {LATENCY_SAMPLES} completed HTTP attempts",
         }
+
         (self.folder / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
         return summary

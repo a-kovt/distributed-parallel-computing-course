@@ -71,6 +71,7 @@ class Etcd:
         kvs = self.call("/v3/kv/range", {"key": b64(key)}).get("kvs", [])
         if not kvs:
             return None
+
         kv = kvs[0]
         return {
             "value": _text(kv.get("value", "")),

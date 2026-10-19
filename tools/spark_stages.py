@@ -38,6 +38,7 @@ def successful_tasks(base: str, app: str, stage: dict) -> list[dict]:
     path = f"/applications/{app}/stages/{stage['stageId']}/{stage['attemptId']}/taskList"
     tasks: list[dict] = []
     offset = 0
+
     while True:
         page = get(base, f"{path}?offset={offset}&length={PAGE}")
         tasks.extend(task for task in page if task.get("status") == "SUCCESS")
@@ -95,6 +96,7 @@ def main() -> None:
         tasks = successful_tasks(args.ui, app, stage)
         if not tasks:
             continue
+
         print(stage_line(stage, tasks))
         if args.tasks:
             durations = sorted((task["duration"] for task in tasks), reverse=True)

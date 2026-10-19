@@ -37,11 +37,16 @@ class Problem(Exception):
         self.extra = extra
 
     def response(self, instance: str) -> JSONResponse:
-        body: dict[str, Any] = {"type": config.PROBLEM_BASE + self.slug, "title": self.title, "status": self.status}
+        body: dict[str, Any] = {
+            "type": config.PROBLEM_BASE + self.slug,
+            "title": self.title,
+            "status": self.status,
+        }
         if self.detail:
             body["detail"] = self.detail
         body["instance"] = instance
         body.update(self.extra)
+
         return JSONResponse(body, status_code=self.status, headers=self.headers, media_type=MEDIA_TYPE)
 
 

@@ -82,6 +82,7 @@ class Context:
         """Seconds left for this run; raises ScenarioStopped when none are left."""
         if self.stop.is_set():
             raise ScenarioStopped("run stopped")
+
         remaining = self.deadline - time.monotonic()
         if remaining <= 0:
             raise ScenarioStopped("scenario deadline exceeded")
@@ -131,6 +132,7 @@ class Context:
 
         if outcome != "expected":
             raise CheckFailed(f"{label}: unexpected HTTP {status}")
+
         self.remaining()
         if self.pause:
             self.wait(self.pause)
@@ -142,6 +144,7 @@ class Context:
         """GET `path` until `done(response)` is true or the scenario deadline expires."""
         if interval <= 0:
             raise ValueError("poll interval must be positive")
+
         while True:
             response = self.request("GET", path, **kwargs)
             if done(response):
@@ -163,6 +166,7 @@ class Context:
                 response = self.opener.open(request, timeout=timeout)
             except urllib.error.HTTPError as error:
                 response = error  # a 4xx/5xx answer is still an answer for the scenario
+
             with response:
                 raw = response.read(MAX_BODY_BYTES + 1)
                 if len(raw) > MAX_BODY_BYTES:
@@ -170,15 +174,20 @@ class Context:
                 headers = {name.lower(): value for name, value in response.headers.items()}
 
                 length = headers.get("content-length")
-                if (request.get_method() != "HEAD" and response.code not in (204, 304)
-                        and not 100 <= response.code < 200
-                        and "transfer-encoding" not in headers and length is not None):
+                if (
+                    request.get_method() != "HEAD"
+                    and response.code not in (204, 304)
+                    and not 100 <= response.code < 200
+                    and "transfer-encoding" not in headers
+                    and length is not None
+                ):
                     try:
                         expected_length = int(length)
                     except ValueError as error:
                         raise TransportFailed("invalid Content-Length") from error
                     if expected_length < 0 or len(raw) != expected_length:
                         raise TransportFailed("incomplete response body")
+
                 return Response(response.code, headers, raw)
         except (OSError, http.client.HTTPException) as error:
             raise TransportFailed(type(error).__name__) from error

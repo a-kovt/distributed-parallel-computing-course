@@ -87,6 +87,7 @@ def publish(producer: Any, path: Path, topic: str, key_field: str, pace_ms: floa
     print(f"queued {queued}; acknowledged {delivery.acknowledged}; pending {pending}; errors {len(delivery.errors)}")
     for error in delivery.errors[:10]:
         print("  ", error)
+
     return int(bool(delivery.errors) or pending > 0 or delivery.acknowledged != queued)
 
 
@@ -99,6 +100,7 @@ def main() -> int:
     parser.add_argument("--pace-ms", type=float, default=0, help="pause between messages")
     parser.add_argument("--timeout", type=float, default=30, help="seconds to wait for a full queue and for delivery")
     args = parser.parse_args()
+
     if not (math.isfinite(args.timeout) and args.timeout > 0 and math.isfinite(args.pace_ms) and args.pace_ms >= 0):
         parser.error("--timeout must be positive and --pace-ms not negative")
 

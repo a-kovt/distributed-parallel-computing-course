@@ -54,9 +54,14 @@ def snapshot() -> dict[str, object]:
         values = list(_latencies_ms)
         statuses = {str(code): count for code, count in sorted(_statuses.items())}
         in_flight = _in_flight
+
     return {
         "uptime_s": round(time.time() - _started, 1),
-        "latency_ms": {"p50": _percentile(values, 50), "p95": _percentile(values, 95), "p99": _percentile(values, 99)},
+        "latency_ms": {
+            "p50": _percentile(values, 50),
+            "p95": _percentile(values, 95),
+            "p99": _percentile(values, 99),
+        },
         "in_flight": in_flight,
         "responses": statuses,
         **{name: read() for name, read in _gauges.items()},
@@ -67,6 +72,7 @@ def prometheus() -> str:
     """The same numbers in the Prometheus text format (GET /metrics/prom, read by Prometheus)."""
     snap = snapshot()
     lines = [f"uptime_seconds {snap['uptime_s']}", f"in_flight {snap['in_flight']}"]
+
     for q, value in snap["latency_ms"].items():
         if value is not None:
             lines.append(f'latency_ms{{quantile="{q}"}} {value}')
@@ -76,4 +82,5 @@ def prometheus() -> str:
         value = snap.get(name)
         if isinstance(value, int | float):
             lines.append(f"{name} {value}")
+
     return "\n".join(lines) + "\n"

@@ -19,6 +19,7 @@ def validate(bases, settings):
 def scenario(ctx):
     headers = {"Authorization": f"Bearer {ctx.settings['token']}"}
     tag = uuid4().hex[:12]
+
     accepted = ctx.request(
         "POST",
         "/v1/returns",
@@ -35,10 +36,12 @@ def scenario(ctx):
     )
     if accepted.status == 429:
         return
+
     final = ctx.poll(
         f"/v1/returns/{quote(str(accepted.json()['id']), safe='')}",
         lambda response: response.json()["state"] in {"done", "rejected", "failed"},
         headers=headers,
         label="state",
     )
+
     ctx.check(final.json()["state"] != "failed")

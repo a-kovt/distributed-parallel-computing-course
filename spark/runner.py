@@ -42,15 +42,19 @@ def parse_request(raw: bytes) -> tuple[str, list[str], list[str]]:
         body = json.loads(raw or b"{}")
     except ValueError as exc:
         raise BadRequest(f"body is not JSON: {exc}") from None
+
     if not isinstance(body, dict):
         raise BadRequest("body must be a JSON object")
+
     script = body.get("script")
     if not isinstance(script, str) or not script:
         raise BadRequest("script must be a non-empty string")
+
     lists = {name: body.get(name, []) for name in ("args", "py_files")}
     for name, value in lists.items():
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             raise BadRequest(f"{name} must be a list of strings")
+
     return script, lists["args"], lists["py_files"]
 
 
@@ -68,6 +72,7 @@ class JobStore:
                 raise BadRequest(f"no such job file in {JOBS_DIR}: {name}")
         if not all(isinstance(arg, str) for arg in args):
             raise BadRequest("args must be strings")
+
         run = f"{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
         conf = [part for item in EXTRA_CONF.split(",") if item for part in ("--conf", item)]
         shipped = ["--py-files", ",".join(str(JOBS_DIR / name) for name in py_files)] if py_files else []
@@ -80,11 +85,20 @@ class JobStore:
             str(JOBS_DIR / script),
             *(arg.replace("{run}", run) for arg in args),
         ]
-        job: Job = {"run": run, "script": script, "args": args, "state": "running", "started": time.time(), "log": []}
+
+        job: Job = {
+            "run": run,
+            "script": script,
+            "args": args,
+            "state": "running",
+            "started": time.time(),
+            "log": [],
+        }
         with self._lock:
             if any(other["script"] == script and other["state"] == "running" for other in self._jobs.values()):
                 raise RuntimeError(f"{script} is already running")
             self._jobs[run] = job
+
         threading.Thread(target=self._follow, args=(job, command), daemon=True).start()
         return job
 
@@ -100,6 +114,7 @@ class JobStore:
             job["log"].append(f"cannot start: {exc}")
             job["exit_code"] = None
             job["state"] = "failed"
+
         job["seconds"] = round(time.time() - job["started"], 1)
 
     def all(self) -> list[Job]:
@@ -142,11 +157,13 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/jobs":
             self._send(404, {"error": "not found"})
             return
+
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             self._send(400, {"error": "bad Content-Length"})
             return
+
         try:
             job = store.start(*parse_request(self.rfile.read(length)))
         except BadRequest as exc:

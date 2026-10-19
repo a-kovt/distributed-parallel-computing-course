@@ -110,6 +110,7 @@ def main() -> None:
     parser.add_argument("--etcd", default="http://localhost:2379")
     parser.add_argument("--every", type=float, default=0.2, help="poll period, seconds")
     args = parser.parse_args()
+
     if not math.isfinite(args.every) or args.every <= 0:
         parser.error("--every must be a positive number of seconds")
 

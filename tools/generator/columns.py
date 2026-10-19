@@ -82,11 +82,14 @@ def load_extensions(path: Path | None) -> dict[str, Callable[..., Any]]:
     """Public functions of the --extend file, by name."""
     if path is None:
         return {}
+
     module_spec = importlib.util.spec_from_file_location("extensions", path)
     if module_spec is None or module_spec.loader is None:
         raise SystemExit(f"cannot load {path}")
+
     module = importlib.util.module_from_spec(module_spec)
     module_spec.loader.exec_module(module)
+
     return {name: value for name, value in vars(module).items() if callable(value) and not name.startswith("_")}
 
 

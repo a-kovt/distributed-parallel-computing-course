@@ -28,7 +28,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await db.open_pool()
     # TODO (O1.2, O1.3): create the bounded queue and start the worker pool here
     log("api.started")
+
     yield
+
     # TODO (D1.4): stop accepting, process what was accepted, then stop the workers
     await db.close_pool()
     log("api.stopped")

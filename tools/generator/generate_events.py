@@ -37,12 +37,14 @@ def make_events(
 ) -> list[Event]:
     rnd = seeded(spec.get("seed", 1), purpose)
     id_field, time_field = spec.get("id_field", "event_id"), spec.get("time_field", "event_time")
+
     events = []
     for number, moment in enumerate(sorted(moments), 1):
         row: Event = {id_field: f"{prefix}{number:08d}", time_field: iso(moment)}
         for name, make in fields.items():
             row[name] = make(number, rnd, row)
         events.append(row)
+
     return events
 
 
@@ -60,11 +62,13 @@ def boundary_events(spec: dict[str, Any], fields: dict[str, Column]) -> list[Eve
     window = timedelta(minutes=spec.get("window_minutes", 15))
     if window <= timedelta(0):
         raise ValueError("window_minutes must be positive")
+
     moments = []
     edge = start + window
     while edge < start + timedelta(minutes=int(spec["minutes"])):
         moments.extend((edge - timedelta(milliseconds=1), edge))
         edge += window
+
     return make_events(spec, moments, fields, "boundary-fields", "boundary-")
 
 
@@ -78,6 +82,7 @@ def apply_delivery(
     stats = {"events": len(events), "late": 0, "duplicates": 0}
     late_share, duplicate_share = scenario.get("late_share", 0), scenario.get("duplicate_share", 0)
     low, high = scenario.get("late_minutes", [1, 10])
+
     for event in sorted(events, key=lambda row: row[time_field]):
         moment = datetime.fromisoformat(event[time_field])
         arrival = moment
@@ -85,11 +90,13 @@ def apply_delivery(
         if delayed < late_share:
             arrival += timedelta(minutes=delay)
             stats["late"] += 1
+
         sent.append((arrival, len(sent), dict(event)))
         repeated, delay = duplicate_random.random(), duplicate_random.uniform(1, 30)
         if repeated < duplicate_share:
             sent.append((arrival + timedelta(seconds=delay), len(sent), dict(event)))
             stats["duplicates"] += 1
+
     sent.sort(key=lambda item: (item[0], item[1]))
     return [event for _, _, event in sent], stats
 
@@ -99,36 +106,41 @@ def generate(
 ) -> tuple[list[Event], dict[str, int]]:
     scenario = spec["scenarios"][scenario_name]
     fields = make_columns(spec["fields"], {}, extensions or {})
+
     events = base_events(spec, fields)
     if scenario.get("boundary"):
         events.extend(boundary_events(spec, fields))
+
     delivered, stats = apply_delivery(events, spec, scenario)
+
     if tick := spec.get("tick"):
         start = datetime.fromisoformat(spec["start"])
         moment = start + timedelta(minutes=int(spec["minutes"]) + tick.get("after_minutes", 30))
         id_field, time_field = spec.get("id_field", "event_id"), spec.get("time_field", "event_time")
         row = {id_field: "tick-" + iso(moment), time_field: iso(moment), **tick.get("fields", {})}
         delivered.append(row)
+
     return delivered, stats
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("spec", type=Path)
     parser.add_argument("--scenario", default="normal")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--extend", type=Path, help="Python file with your custom field functions")
     args = parser.parse_args()
+
     spec = json.loads(args.spec.read_text(encoding="utf-8"))
     if args.scenario not in spec["scenarios"]:
         print(f"no scenario {args.scenario!r}; the spec has {sorted(spec['scenarios'])}", file=sys.stderr)
         return 2
+
     events, stats = generate(spec, args.scenario, load_extensions(args.extend))
     with args.out.open("w", encoding="utf-8", newline="\n") as out:
         for event in events:
             out.write(json.dumps(event, ensure_ascii=False, default=to_json) + "\n")
+
     print(
         f"{args.out}: {len(events)} lines, {stats['events']} distinct events, "
         f"{stats['late']} late, {stats['duplicates']} duplicates"

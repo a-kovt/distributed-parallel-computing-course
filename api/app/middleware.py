@@ -22,6 +22,7 @@ async def observe(request: Request, call_next: RequestResponseEndpoint) -> Respo
     incoming = request.headers.get("x-request-id", "")
     request_id = incoming if _SANE_ID.match(incoming) else str(uuid.uuid4())
     request.state.request_id = request_id
+
     started = time.perf_counter()
     status = 500
     metrics.request_started()
@@ -43,6 +44,7 @@ async def observe(request: Request, call_next: RequestResponseEndpoint) -> Respo
             status=status,
             duration_ms=round(elapsed_ms, 1),
         )
+
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Instance"] = config.INSTANCE
     return response

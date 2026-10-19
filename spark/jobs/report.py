@@ -41,6 +41,7 @@ def main() -> None:
     spark = session()
     if args.partitions:
         spark.conf.set("spark.sql.shuffle.partitions", args.partitions)
+
     report = build(spark.read.parquet(args.facts), spark.read.parquet(args.dim))
     report.write.mode("error").parquet(args.out)
 

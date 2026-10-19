@@ -90,9 +90,11 @@ def load_scenario(path: Path) -> ModuleType:
     spec = importlib.util.spec_from_file_location("workload_scenario", path)
     if spec is None or spec.loader is None:
         raise ValueError("cannot load scenario")
+
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
+
     if not callable(getattr(module, "scenario", None)):
         raise TypeError("scenario file must define scenario(ctx)")
     return module
@@ -103,11 +105,13 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("scenario", type=Path)
+
     limit = parser.add_mutually_exclusive_group()
     limit.add_argument("--runs", type=int, help="number of scenario starts (default 1)")
     limit.add_argument(
         "--duration", type=positive, help="seconds admitting new scenarios; active ones then finish"
     )
+
     parser.add_argument(
         "--rate", type=positive, default=1, help="target scenario starts per second, not HTTP requests"
     )
@@ -118,6 +122,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--pause", type=non_negative, default=0, help="pause after each HTTP response, seconds"
     )
     parser.add_argument("--seed", type=int, default=7, help="seed of ctx.random")
+
     parser.add_argument("--base", action="append", default=[], metavar="NAME=URL")
     parser.add_argument("--set", action="append", default=[], metavar="NAME=VALUE")
     parser.add_argument("--env", action="append", default=[], metavar="NAME=ENVIRONMENT_VARIABLE")
@@ -130,6 +135,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         parser.error("runs and concurrency must be positive integers")
     if args.out.exists():
         parser.error(f"{args.out} exists: choose a new output folder")
+
     try:
         args.bases = read_bases(args.base)
         args.settings = read_settings(args.set, args.env)
@@ -138,6 +144,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
             args.module.validate(args.bases, args.settings)
     except (ValueError, TypeError, OSError, KeyError) as error:
         parser.error(str(error))
+
     return args
 
 
@@ -167,9 +174,8 @@ def execute(
             results.scenario("stopped")
         except Exception as error:
             results.scenario("failed")
-            print(
-                f"scenario {index}: {type(error).__name__}", file=sys.stderr
-            )  # no message: it may hold a token
+            # no message: it may hold a token
+            print(f"scenario {index}: {type(error).__name__}", file=sys.stderr)
         else:
             results.scenario("passed")
 
@@ -205,6 +211,7 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as error:
         print(f"cannot create {args.out}: {error}", file=sys.stderr)
         return 2
+
     stop = threading.Event()
 
     def make_context(index: int) -> Context:
@@ -235,6 +242,7 @@ def main(argv: list[str] | None = None) -> int:
         f"scenarios={summary['scenarios']} requests={summary['requests']} skipped_starts={summary['skipped_starts']}"
     )
     print(f"results: {args.out}")
+
     if summary["interrupted"]:
         return EXIT_INTERRUPTED
     return int(bool(summary["scenarios"].get("failed") or summary["scenarios"].get("stopped")))

@@ -28,7 +28,11 @@ stop = threading.Event()
 
 
 def log(event: str, **fields: object) -> None:
-    line = {"time": datetime.now(UTC).isoformat(timespec="milliseconds"), "instance": INSTANCE, "event": event}
+    line = {
+        "time": datetime.now(UTC).isoformat(timespec="milliseconds"),
+        "instance": INSTANCE,
+        "event": event,
+    }
     sys.stdout.write(json.dumps({**line, **fields}, ensure_ascii=False) + "\n")
     sys.stdout.flush()
 
@@ -36,15 +40,18 @@ def log(event: str, **fields: object) -> None:
 def main() -> None:
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     client = Etcd(ETCD_URL)
+
     while not stop.is_set():
         try:
             client.get("/health-probe")
             break
         except OSError:
             time.sleep(1)
+
     log("coordinator.started", lease_ttl_s=LEASE_TTL_S)
     log("todo", item="O6.1", what="take the role through an etcd lease")
     stop.wait()
+
     log("coordinator.stopped")
 
 

@@ -43,13 +43,16 @@ def build_rows(table: str, seed: int, start: int, count: int, columns: dict[str,
     """Rows start .. start+count-1 of one table (start is a multiple of BLOCK_ROWS)."""
     data: dict[str, list[Any]] = {name: [] for name in columns}
     rnd = block_random(seed, table, start // BLOCK_ROWS)
+
     for number in range(start, start + count):
         if number % BLOCK_ROWS == 0:
             rnd = block_random(seed, table, number // BLOCK_ROWS)
+
         row: Row = {}
         for name, column in columns.items():
             row[name] = column(number, rnd, row)
             data[name].append(row[name])
+
     return pa.table(data)
 
 
@@ -59,7 +62,9 @@ def write_reference(
     """The reference table; returns its keys and the hot key for `ref` columns."""
     ref = spec["reference"]
     name, key, hot, rows = ref["name"], ref["key"], ref["hot_key"], ref["rows"]
-    columns = {key: {"kind": "seq", "prefix": ref.get("key_prefix", ""), "width": ref.get("key_width", 5)}}
+    columns = {
+        key: {"kind": "seq", "prefix": ref.get("key_prefix", ""), "width": ref.get("key_width", 5)},
+    }
     columns |= ref.get("columns", {})
 
     table = build_rows(name, seed, 0, rows, make_columns(columns, {}, extensions))
@@ -70,6 +75,7 @@ def write_reference(
     (out / name).mkdir(parents=True, exist_ok=True)
     pq.write_table(table, out / name / f"{name}.parquet")
     print(f"{name}: {rows} rows, hot key {hot!r}")
+
     return {name: (keys, hot)}
 
 
@@ -105,6 +111,7 @@ def write_part(job: FactsJob, part: int, start: int, count: int) -> Counter[str]
         if column_spec["kind"] == "ref":
             hot = job.keys[column_spec["table"]][1]
             hot_counts[column] = table.column(column).to_pylist().count(hot)
+
     return hot_counts
 
 
@@ -112,6 +119,7 @@ def write_facts(job: FactsJob, rows: int, jobs: int) -> None:
     """Replace existing parts, including excess parts left by a larger prior run."""
     facts = job.spec["facts"]
     name = facts["name"]
+
     job.folder.mkdir(parents=True, exist_ok=True)
     for old in job.folder.glob("part-*.parquet"):
         old.unlink()
@@ -120,6 +128,7 @@ def write_facts(job: FactsJob, rows: int, jobs: int) -> None:
     counts = [min(PART_ROWS, rows - start) for start in starts]
     hot_counts: Counter[str] = Counter()
     done = 0
+
     with ProcessPoolExecutor(max_workers=jobs) as pool:
         results = pool.map(write_part, [job] * len(counts), range(len(counts)), starts, counts)
         for part_counts, count in zip(results, counts, strict=True):
@@ -156,6 +165,7 @@ def main() -> None:
     rows = spec["facts"]["rows"] if args.rows is None else args.rows
     if not isinstance(rows, int) or isinstance(rows, bool) or rows <= 0 or args.jobs <= 0:
         parser.error("rows and jobs must be positive integers")
+
     extensions = load_extensions(args.extend)
     if missing := missing_functions(spec, extensions):
         parser.error(f"custom functions not found: {', '.join(missing)}; pass --extend FILE")
