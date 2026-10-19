@@ -86,7 +86,7 @@ services:
         delay: 5s
 
   postgres:
-    image: postgres:16.4
+    image: postgres:17.11
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
@@ -99,7 +99,7 @@ services:
           - node.labels.db == true
 
   etcd:
-    image: quay.io/coreos/etcd:v3.5.17
+    image: quay.io/coreos/etcd:v3.7.2
     command:
       - etcd
       - --name=etcd

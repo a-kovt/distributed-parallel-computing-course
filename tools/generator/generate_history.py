@@ -1,6 +1,8 @@
 # /// script
 # requires-python = ">=3.14"
-# dependencies = ["pyarrow>=18"]
+# dependencies = [
+#     "pyarrow>=26",
+# ]
 # ///
 """History generator for lab 4: a fact table and a reference table in Parquet from a JSON spec.
 

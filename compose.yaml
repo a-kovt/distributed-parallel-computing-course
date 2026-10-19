@@ -83,7 +83,7 @@ x-coordinator: &coordinator
 
 services:
   postgres:
-    image: postgres:16.4
+    image: postgres:17.11
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
@@ -99,7 +99,7 @@ services:
       interval: 2s
       retries: 30
   migrate:
-    image: postgres:16.4
+    image: postgres:17.11
     command:
       - "sh"
       - "/migrate/migrate.sh"
@@ -202,7 +202,7 @@ services:
       - "${SPARK_HISTORY_PORT:-18080}:18080"
 
   kafka:
-    image: apache/kafka:3.8.0
+    image: apache/kafka:4.3.1
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -225,7 +225,7 @@ services:
       retries: 40
     restart: unless-stopped
   kafka-init:
-    image: apache/kafka:3.8.0
+    image: apache/kafka:4.3.1
     command:
       - "sh"
       - "/scripts/topics.sh"
@@ -239,7 +239,7 @@ services:
         condition: service_healthy
     restart: "no"
   kafka-ui:
-    image: kafbat/kafka-ui:v1.3.0
+    image: kafbat/kafka-ui:v1.5.0
     environment:
       KAFKA_CLUSTERS_0_NAME: dpc
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
@@ -266,7 +266,7 @@ services:
         condition: service_started
 
   etcd:
-    image: quay.io/coreos/etcd:v3.5.17
+    image: quay.io/coreos/etcd:v3.7.2
     command:
       - "etcd"
       - "--name=etcd"
@@ -287,13 +287,13 @@ services:
       INSTANCE: coordinator-b
 
   prometheus:
-    image: prom/prometheus:v2.55.1
+    image: prom/prometheus:v3.15.0
     volumes:
       - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "${PROMETHEUS_PORT:-9091}:9090"
   grafana:
-    image: grafana/grafana:11.3.1
+    image: grafana/grafana:13.2.4
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer

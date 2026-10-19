@@ -1,7 +1,7 @@
 # One image for api, ray-head, ray-worker and your coordinators. A Ray client must have the same
 # Python and Ray versions as the cluster, and the workers must import your task code: one image
 # from one uv.lock guarantees both. Python 3.14, dependencies from uv.lock.
-FROM ghcr.io/astral-sh/uv:0.9.2-python3.14-bookworm-slim
+FROM ghcr.io/astral-sh/uv:0.13.1-python3.14-trixie-slim
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \

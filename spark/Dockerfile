@@ -2,10 +2,10 @@
 # PySpark refuses to run when the driver and the executors have different Python minor
 # versions: every Spark container is built from this one file. The pyspark package ships the
 # Spark distribution itself (bin/spark-submit, bin/spark-class, jars), so no separate download.
-FROM python:3.14-slim-bookworm
+FROM python:3.14-slim-trixie
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends openjdk-17-jre-headless procps \
+ && apt-get install -y --no-install-recommends openjdk-21-jre-headless procps \
  && ln -s "$(dirname "$(dirname "$(readlink -f /usr/bin/java)")")" /opt/java \
  && rm -rf /var/lib/apt/lists/*
 
